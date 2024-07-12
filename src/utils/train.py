@@ -10,6 +10,8 @@ from Dataset import DAICDataset
 from downloader import file_processor
 from url_extractor import get_file_url
 
+load_dotenv()
+
 
 def train():
     model = MultiModalModel()
@@ -19,6 +21,8 @@ def train():
     base_url = os.getenv('EDAIC_DATA_URL')
     file_urls = get_file_url()
 
+    # loop through all files
     for file_url in file_urls:
+        # load data into dataset class
         data = file_processor(base_url + file_url)
         dataset = DAICDataset(io.ByteIO(data.get()))
