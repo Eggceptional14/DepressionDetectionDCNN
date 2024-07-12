@@ -4,3 +4,4 @@ sample dissertation/
 venv/
 *.env
 *.ipynb
+__pycache__/
