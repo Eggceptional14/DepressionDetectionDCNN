@@ -3,3 +3,4 @@ sample dissertation/
 .DS_Store
 venv/
 *.env
+*.ipynb
