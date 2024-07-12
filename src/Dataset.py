@@ -2,7 +2,7 @@ from torch.utils.data import Dataset
 import pandas as pd
 
 
-class FacialDataset(Dataset):
+class DAICDataset(Dataset):
     def __init__(self, feature_file, label_file=None, is_train=True):
         self.visual_feature = pd.read_csv(feature_file)
         self.labels = None
