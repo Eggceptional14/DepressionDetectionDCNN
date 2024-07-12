@@ -29,8 +29,7 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 ## Acknowledgments
 
 My sincere gratitude goes toward my advisor Dr. Edmond S. L. Ho for guiding this project. I also
-wanted to express my thanks towards my friends and family for their support through out
-this time.
+wanted to express my thanks towards USC Institute for Creative Technology for providing the dataset used by this project.
 
 
 <!-- Inspiration, code snippets, etc.
