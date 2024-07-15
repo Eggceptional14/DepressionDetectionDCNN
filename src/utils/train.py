@@ -26,10 +26,14 @@ def train():
     for file_url in file_urls:
         # load data into dataset class
         data = file_processor(base_url + file_url)
-        landmarks = io.ByteIO(data.get(f'{file_url[:4]}CLNF_features.txt'))
-        aus = io.ByteIO(data.get(f'{file_url[:4]}CLNF_AUs.txt'))
-        gaze = io.ByteIO(data.get(f'{file_url[:4]}CLNF_gaze.txt'))
-        dataset = DAICDataset(landmarks, 
+        pid = file_url[:3]
+
+        landmarks = io.ByteIO(data.get(f'{pid}_CLNF_features.txt'))
+        aus = io.ByteIO(data.get(f'{pid}_CLNF_AUs.txt'))
+        gaze = io.ByteIO(data.get(f'{pid}_CLNF_gaze.txt'))
+        
+        dataset = DAICDataset(pid,
+                              landmarks, 
                               aus, 
                               gaze, 
                               label_file='data/daic/train_split_Depression_AVEC2017.csv',
