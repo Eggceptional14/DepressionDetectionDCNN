@@ -24,16 +24,18 @@ class DAICDataset(Dataset):
         pid = self.split_details['Participant_ID'].iloc[idx]
 
         file_url = f"{str(pid)}_P.zip"
+        print(f'##### Start Downloading File: {file_url} #####\n')
         data = file_processor(self.data_url + file_url)
-        print(f'##### Finish Downloading File: {file_url} #####\n')
+        print('##### Download Complete #####')
 
         landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')))
         aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
         gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
 
-        landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:]
-        aus = aus[aus[' success'] == 1].iloc[:, 4:]
-        gaze = gaze[gaze[' success'] == 1].iloc[:, 4:]
+        # remove frames that openface failed to capture the feature
+        landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values
+        aus = aus[aus[' success'] == 1].iloc[:, 4:].values
+        gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values
         
         sample = {
             'pid': pid,
