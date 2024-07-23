@@ -28,7 +28,7 @@ def train():
     }
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = LSTMModel(input_size=136, hidden_size=config['hidden_size'], output_size=1, device=device)
+    model = LSTMModel(input_size=136, hidden_size=config['hidden_size'], output_size=2, device=device)
     model.to(device)
 
     optimizer = optim.Adam(model.parameters(), lr=config['lr'])
@@ -54,12 +54,13 @@ def train():
             print("##### Start Training #####")
             pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
             optimizer.zero_grad()
-            output = model(landmarks)
+            output, attention_weights = model(landmarks)
             loss = criterion(output, label)
             loss.backward()
             optimizer.step()
             print(f'##### {config['batch_size']} Batch Finish #####\n')
-            
+            break
+
         print('##### Training Complete, Starting Evaluation #####\n')
 
         # Evaluation loop
@@ -72,12 +73,13 @@ def train():
             for batch in val_loader:
                 print("##### Start Evaluation #####")
                 pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
-                output = model(landmarks)
+                output, attention_weights = model(landmarks)
                 val_loss += criterion(output, label).item()
                 _, predicted = torch.max(output.data, 1)
                 total_correct += (predicted == label).sum().item()
                 total_elements += label.nelement()
                 print(f'##### {config['batch_size']} Batch Finish #####\n')
+                break
 
         val_loss /= len(val_loader)
         accuracy = total_correct / total_elements
@@ -86,6 +88,5 @@ def train():
 
     print('##### Training complete #####\n\n')
 
-        
 if __name__ == "__main__":
     train()
