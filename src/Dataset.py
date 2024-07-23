@@ -3,6 +3,7 @@ import io
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
+import numpy as np
 from dotenv import load_dotenv
 
 from utils.downloader import file_processor
@@ -33,9 +34,9 @@ class DAICDataset(Dataset):
         gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
 
         # remove frames that openface failed to capture the feature
-        landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values
-        aus = aus[aus[' success'] == 1].iloc[:, 4:].values
-        gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values
+        landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
+        aus = aus[aus[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
+        gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
         
         sample = {
             'pid': pid,
