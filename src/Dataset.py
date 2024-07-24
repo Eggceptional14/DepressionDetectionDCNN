@@ -17,6 +17,7 @@ class DAICDataset(Dataset):
         self.split_details = pd.read_csv(split_details) # read split of DAIC dataset (contains pid and labels)
         self.data_url = os.getenv('DAIC_DATA_URL')
         self.is_train = is_train
+        self.from_web = False
 
     def __len__(self):
         return len(self.split_details)
@@ -24,14 +25,20 @@ class DAICDataset(Dataset):
     def __getitem__(self, idx):
         pid = self.split_details['Participant_ID'].iloc[idx]
 
-        file_url = f"{str(pid)}_P.zip"
-        print(f'##### Start Downloading File: {file_url} #####\n')
-        data = file_processor(self.data_url + file_url)
-        print('##### Download Complete #####')
+        if self.from_web:
+            file_url = f"{str(pid)}_P.zip"
+            print(f'##### Start Downloading File: {file_url} #####\n')
+            data = file_processor(self.data_url + file_url)
+            print('##### Download Complete #####')
 
-        landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')))
-        aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
-        gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
+            landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')))
+            aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
+            gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
+        else:
+            base_url = os.getenv('DISK_DIR')
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt')
+            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
+            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
         # remove frames that openface failed to capture the feature
         landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
