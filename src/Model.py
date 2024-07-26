@@ -28,7 +28,7 @@ class CNNModel(nn.Module):
         return
 
 class LSTMModel(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, device, num_layers=1):
+    def __init__(self, input_size, hidden_size, output_size, device, dropout_prob, num_layers=1):
         super(LSTMModel, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
@@ -40,6 +40,8 @@ class LSTMModel(nn.Module):
 
         self.fc = nn.Linear(hidden_size, output_size)
         self.softmax = nn.Softmax(dim=1)
+
+        self.dropout = nn.Dropout(dropout_prob)
 
         # self.fc = nn.Sequential(
         #     nn.Linear(hidden_size, 64),
@@ -56,6 +58,7 @@ class LSTMModel(nn.Module):
         out, _ = self.lstm(x, (h0, c0))
         out, attention_weights = self.attention(out)
         out = out[:, -1, :]
+        out = self.dropout(out)
         out = self.fc(out)
         return self.softmax(out), attention_weights
     
