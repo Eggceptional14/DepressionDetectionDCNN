@@ -22,11 +22,11 @@ load_dotenv()
 def train_model(config):
     # use the same config as the previous work
     landmarks_size = 136
-    aus_size = 1
-    gaze_size = 1
+    aus_size = 20
+    gaze_size = 12
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = LSTMModel(input_size=landmarks_size, hidden_size=config['hidden_size'], output_size=2, device=device)
+    model = LSTMModel(input_size=aus_size, hidden_size=config['hidden_size'], output_size=2, device=device)
     model.to(device)
 
     # train_labels_dir = "data/daic/train_split_Depression_AVEC2017.csv"
@@ -64,7 +64,7 @@ def train_model(config):
             # print("##### Start Training #####")
             pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
             optimizer.zero_grad()
-            output, attention_weights = model(landmarks)
+            output, attention_weights = model(aus)
             loss = criterion(output, label)
             loss.backward()
             optimizer.step()
@@ -82,7 +82,7 @@ def train_model(config):
             for batch in val_loader:
                 # print("##### Start Evaluation #####")
                 pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
-                output, attention_weights = model(landmarks)
+                output, attention_weights = model(aus)
                 val_loss += criterion(output, label).item()
                 _, predicted = torch.max(output.data, 1)
                 total_correct += (predicted == label).sum().item()
@@ -131,7 +131,7 @@ if __name__ == "__main__":
 
     result = tune.run(
             train_model,
-            resources_per_trial={"cpu": 4, "gpu": 0},
+            resources_per_trial={"cpu": 8, "gpu": 0},
             config=config,
             num_samples=1,
             scheduler=scheduler,
