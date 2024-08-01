@@ -44,6 +44,12 @@ class DAICDataset(Dataset):
         landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
         aus = aus[aus[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
         gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
+
+        # sub-sampling frame
+        step = 10
+        landmarks = landmarks[::step]
+        aus = aus[::step]
+        gaze = gaze[::step]
         
         sample = {
             'pid': pid,
