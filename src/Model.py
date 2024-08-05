@@ -23,9 +23,10 @@ class CNNModel(nn.Module):
         self.relu3 = nn.ReLU()
 
         self.attention = Attention(hidden_size, 1)
+        self.global_avg_pool = nn.AdaptiveAvgPool1d(1)
 
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size, 64),
+            nn.Linear(hidden_size , 64),
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(64, 32),
@@ -36,23 +37,22 @@ class CNNModel(nn.Module):
 
     def forward(self, x):
         x = x.permute(0, 2, 1)
-        # print(x.shape)
-
         x = self.pool1(self.relu1(self.conv1(x)))
         x = self.dropout(x)
         x = self.pool2(self.relu2(self.conv2(x)))
         x = self.dropout(x)
         x = self.pool3(self.relu3(self.conv3(x)))
         x = self.dropout(x)
+        
+        x = x.permute(0, 2, 1)
+        x, attention_weights = self.attention(x)
 
-        # x = x.permute(0, 2, 1)
-        # x, attention_weights = self.attention(x)
-        # x = x.mean(dim=1)
+        x = x.permute(0, 2, 1)
+        x = self.global_avg_pool(x)
+        x = x.squeeze(-1)
 
-        x = x.view(x.size(0), -1)
         x = self.fc(x)
-        return x
-
+        return x, attention_weights
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, device, dropout_prob, num_layers=1):
         super(LSTMModel, self).__init__()
