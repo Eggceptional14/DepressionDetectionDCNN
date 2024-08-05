@@ -13,11 +13,12 @@ load_dotenv()
 
 class DAICDataset(Dataset):
 
-    def __init__(self, split_details, is_train=True):
+    def __init__(self, split_details, step, is_train=True):
         self.split_details = pd.read_csv(split_details) # read split of DAIC dataset (contains pid and labels)
         self.data_url = os.getenv('DAIC_DATA_URL')
         self.is_train = is_train
         self.from_web = False
+        self.frame_step = step
 
     def __len__(self):
         return len(self.split_details)
@@ -46,10 +47,9 @@ class DAICDataset(Dataset):
         gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
 
         # sub-sampling frame
-        step = 10
-        landmarks = landmarks[::step]
-        aus = aus[::step]
-        gaze = gaze[::step]
+        landmarks = landmarks[::self.frame_step]
+        aus = aus[::self.frame_step]
+        gaze = gaze[::self.frame_step]
         
         sample = {
             'pid': pid,
