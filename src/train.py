@@ -19,29 +19,32 @@ from Dataset import DAICDataset
 load_dotenv()
 
 
-def train_model(config):
+def train_model(config):  # sourcery skip: low-code-quality
     # use the same config as the previous work
-    landmarks_size = 136
-    aus_size = 20
-    gaze_size = 12
-    m_name = "lstm_aus"
+    feature_size = {"landmarks": 136, "aus": 20, "gaze": 12}
+    m_name = f"{config['model']}_{config['feature']}"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = LSTMModel(input_size=aus_size, 
-                      hidden_size=config['hidden_size'], 
-                      dropout_prob=config['dropout'], 
-                      output_size=2, 
-                      device=device)
-    # model = CNNModel(input_channels=aus_size, 
-    #                  hidden_size=config['hidden_size'], 
-    #                  output_size=2, 
-    #                  dropout=config['dropout'])
-    # model = MultiModalModel(ip_size_landmarks=landmarks_size,
-    #                         ip_size_aus=aus_size,
-    #                         ip_size_gaze=gaze_size,
-    #                         hidden_size=config['hidden_size'],
-    #                         output_size=2,
-    #                         device=device)
+
+    if config['model'] == "lstm":
+        model = LSTMModel(input_size=feature_size[config['feature']], 
+                          hidden_size=config['hidden_size'], 
+                          dropout_prob=config['dropout'], 
+                          output_size=2, 
+                          device=device)
+    elif config['model'] == "cnn":
+        model = CNNModel(input_channels=feature_size[config['feature']], 
+                         hidden_size=config['hidden_size'], 
+                         output_size=2, 
+                         dropout=config['dropout'])
+    elif config['model'] == "multimodal":
+        model = MultiModalModel(ip_size_landmarks=feature_size['landmarks'],
+                                ip_size_aus=feature_size['aus'],
+                                ip_size_gaze=feature_size['gaze'],
+                                hidden_size=config['hidden_size'],
+                                output_size=2,
+                                device=device)
+
     model.to(device)
 
     train_labels_dir = "/Users/pitchakorn/Dissertation/data/daic/train_split_Depression_AVEC2017.csv"
@@ -65,24 +68,38 @@ def train_model(config):
         optimizer = optim.Adam(model.parameters(), lr=config['lr'])
 
     criterion = nn.CrossEntropyLoss()
-    # print("##### Model Training #####\n\n")
 
     for epoch in range(start_epoch, config["epochs"]):
         model.train()
 
         # Training loop
         for batch in train_loader:
-            # print("##### Start Training #####")
-            pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
             optimizer.zero_grad()
-            output, attention_weights = model(aus)
-            # output, _ = model(landmarks, aus, gaze)
-            loss = criterion(output, label)
-            loss.backward()
-            optimizer.step()
-            # print(f'##### {config['batch_size']} Batch Finish #####\n')
 
-        # print('##### Training Complete, Starting Evaluation #####\n')
+            if config['model'] == "multimodal":
+                landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
+                label = batch['label'].to(device)
+                min_frames = min(len(landmarks), len(aus), len(gaze))
+                for i in range(0, min_frames, config['seg_length']):
+                        end_landmarks = min(i + config['seg_length'], len(landmarks))
+                        end_aus = min(i + config['seg_length'], len(aus))
+                        end_gaze = min(i + config['seg_length'], len(gaze))
+                        output, attention_weights = model(landmarks[i:end_landmarks],
+                                                          aus[i:end_aus],
+                                                          gaze[i:end_gaze])
+                        loss = criterion(output, label)
+                        loss.backward()
+                        optimizer.step()
+            else:
+                data = batch[config['feature']].to(device)
+                label = batch['label'].to(device)
+                num_frames = len(data)
+                for i in range(0, num_frames, config['seg_length']):
+                    end = min(i + config['seg_length'], num_frames)
+                    output, attention_weights = model(data[i:end])
+                    loss = criterion(output, label)
+                    loss.backward()
+                    optimizer.step()
 
         # Evaluation loop
         model.eval()
@@ -92,21 +109,36 @@ def train_model(config):
 
         with torch.no_grad():
             for batch in val_loader:
-                # print("##### Start Evaluation #####")
-                pid, landmarks, aus, gaze, label = batch['pid'], batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device), batch['label'].to(device)
-                output, attention_weights = model(aus)
-                # output, _ = model(landmarks, aus, gaze)
-                val_loss += criterion(output, label).item()
-                _, predicted = torch.max(output.data, 1)
-                total_correct += (predicted == label).sum().item()
-                # total_elements += label.nelement()
-                total_elements += label.size(0)
-                # print(f'##### {config['batch_size']} Batch Finish #####\n')
+                if config['model'] == "multimodal":
+                    landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
+                    label = batch['label'].to(device)
+                    min_frames = min(len(landmarks), len(aus), len(gaze))
+                    for i in range(0, min_frames, config['seg_length']):
+                        end_landmarks = min(i + config['seg_length'], len(landmarks))
+                        end_aus = min(i + config['seg_length'], len(aus))
+                        end_gaze = min(i + config['seg_length'], len(gaze))
+                        output, attention_weights = model(landmarks[i:end_landmarks],
+                                                          aus[i:end_aus],
+                                                          gaze[i:end_gaze])
+                        val_loss += criterion(output, label).item()
+                        _, predicted = torch.max(output.data, 1)
+                        total_correct += (predicted == label).sum().item()
+                        total_elements += label.size(0)
+                        
+                else:
+                    data = batch[config['feature']].to(device)
+                    label = batch['label'].to(device)
+                    num_frames = len(data)
+                    for i in range(0, num_frames, config['seg_length']):
+                        end = min(i + config['seg_length'], num_frames)
+                        output, attention_weights = model(data[i:end])
+                        val_loss += criterion(output, label).item()
+                        _, predicted = torch.max(output.data, 1)
+                        total_correct += (predicted == label).sum().item()
+                        total_elements += label.size(0)
 
         val_loss /= len(val_loader)
         accuracy = total_correct / total_elements
-
-        # print(f'Validation Loss: {val_loss} | Accuracy: {accuracy}')
 
         checkpoint_data = {
             "epoch": epoch,
@@ -126,3 +158,4 @@ def train_model(config):
             )
 
     # print('##### Training complete #####\n\n')
+
