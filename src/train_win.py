@@ -15,20 +15,35 @@ from Dataset import DAICDataset
 load_dotenv()
 
 def train_model(config):
-    landmarks_size = 136
-    aus_size = 1
-    gaze_size = 1
+    feature_size = {"landmarks": 136, "aus": 20, "gaze": 12}
+    m_name = f"{config['model']}_{config['feature']}"
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    # model = LSTMModel(input_size=landmarks_size, hidden_size=config['hidden_size'], dropout_prob=config['dropout'], output_size=2, device=device)
-    model = CNNModel(landmarks_size, config['hidden_size'])
+    if config['model'] == "lstm":
+        model = LSTMModel(input_size=feature_size[config['feature']], 
+                          hidden_size=config['hidden_size'], 
+                          dropout_prob=config['dropout'], 
+                          output_size=2, 
+                          device=device)
+    elif config['model'] == "cnn":
+        model = CNNModel(input_channels=feature_size[config['feature']], 
+                         hidden_size=config['hidden_size'], 
+                         output_size=2, 
+                         dropout=config['dropout'])
+    elif config['model'] == "multimodal":
+        model = MultiModalModel(ip_size_landmarks=feature_size['landmarks'],
+                                ip_size_aus=feature_size['aus'],
+                                ip_size_gaze=feature_size['gaze'],
+                                hidden_size=config['hidden_size'],
+                                output_size=2,
+                                device=device)
     model.to(device)
 
     train_labels_dir = r"D:\DepressionDetectionDL\data\train_split_Depression_AVEC2017.csv"
     val_labels_dir = r"D:\DepressionDetectionDL\data\dev_split_Depression_AVEC2017.csv"
 
-    train_dataset = DAICDataset(train_labels_dir, is_train=True)
-    val_dataset = DAICDataset(val_labels_dir, is_train=True)
+    train_dataset = DAICDataset(train_labels_dir, config['frame_step'], is_train=True)
+    val_dataset = DAICDataset(val_labels_dir, config['frame_step'], is_train=True)
 
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=True)
@@ -37,25 +52,41 @@ def train_model(config):
     criterion = nn.CrossEntropyLoss()
     scaler = GradScaler()
 
-    epochs = 10
-    for epoch in range(epochs):
+    accs, losses = [], []
+
+    for epoch in range(config['epochs']):
         model.train()
         torch.cuda.empty_cache()
         gc.collect()
         print(f'Epoch: {epoch}')
 
-        # Training loop
-        for i, batch in enumerate(train_loader):
-            _, landmarks, label = batch['pid'], batch['landmarks'].to(device), batch['label'].to(device)
+        for batch in train_loader:
             optimizer.zero_grad()
-            
-            with autocast(device_type=device):
-                output, _ = model(landmarks)
-                loss = criterion(output, label)
-            
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+
+            if config['model'] == "multimodal":
+                landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
+                label = batch['label'].to(device)
+                min_frames = min(len(landmarks), len(aus), len(gaze))
+                for i in range(0, min_frames, config['seg_length']):
+                        end_landmarks = min(i + config['seg_length'], len(landmarks))
+                        end_aus = min(i + config['seg_length'], len(aus))
+                        end_gaze = min(i + config['seg_length'], len(gaze))
+                        output, attention_weights = model(landmarks[i:end_landmarks],
+                                                          aus[i:end_aus],
+                                                          gaze[i:end_gaze])
+                        loss = criterion(output, label)
+                        loss.backward()
+                        optimizer.step()
+            else:
+                data = batch[config['feature']].to(device)
+                label = batch['label'].to(device)
+                num_frames = len(data)
+                for i in range(0, num_frames, config['seg_length']):
+                    end = min(i + config['seg_length'], num_frames)
+                    output, attention_weights = model(data[i:end])
+                    loss = criterion(output, label)
+                    loss.backward()
+                    optimizer.step()
 
         # Evaluation loop
         model.eval()
@@ -65,20 +96,52 @@ def train_model(config):
 
         with torch.no_grad():
             for batch in val_loader:
-                _, landmarks, label = batch['pid'], batch['landmarks'].to(device), batch['label'].to(device)
-                output, _ = model(landmarks)
-                val_loss += criterion(output, label).item()
-                _, predicted = torch.max(output.data, 1)
-                total_correct += (predicted == label).sum().item()
-                total_elements += label.nelement()
+                if config['model'] == "multimodal":
+                    landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
+                    label = batch['label'].to(device)
+                    min_frames = min(len(landmarks), len(aus), len(gaze))
+                    for i in range(0, min_frames, config['seg_length']):
+                        end_landmarks = min(i + config['seg_length'], len(landmarks))
+                        end_aus = min(i + config['seg_length'], len(aus))
+                        end_gaze = min(i + config['seg_length'], len(gaze))
+                        output, attention_weights = model(landmarks[i:end_landmarks],
+                                                          aus[i:end_aus],
+                                                          gaze[i:end_gaze])
+                        val_loss += criterion(output, label).item()
+                        _, predicted = torch.max(output.data, 1)
+                        total_correct += (predicted == label).sum().item()
+                        total_elements += label.size(0)
+                        
+                else:
+                    data = batch[config['feature']].to(device)
+                    label = batch['label'].to(device)
+                    num_frames = len(data)
+                    for i in range(0, num_frames, config['seg_length']):
+                        end = min(i + config['seg_length'], num_frames)
+                        output, attention_weights = model(data[i:end])
+                        val_loss += criterion(output, label).item()
+                        _, predicted = torch.max(output.data, 1)
+                        total_correct += (predicted == label).sum().item()
+                        total_elements += label.size(0)
 
         val_loss /= len(val_loader)
         accuracy = total_correct / total_elements
 
-        print(f'Epoch {epoch+1}, Validation Loss: {val_loss}, Accuracy: {accuracy}')
+        losses.append(val_loss)
+        accs.append(accuracy)
 
+        print(f'Epoch {epoch}, Validation Loss: {val_loss}, Accuracy: {accuracy}')
+
+        if epoch != 0 and ((epoch % 10 == 0) or (epoch == config['epochs'] - 1)):
+            save_dir = os.path.join(r"D:\DepressionDetectionDL\models", m_name, str(epoch))
+            os.makedirs(save_dir, exist_ok=True)
+            
+            torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
+            torch.save(optimizer.state_dict(), os.path.join(save_dir, "optim.pth"))
+            
+    pd.DataFrame({'loss': losses, 'accuracy': accs}).to_csv(f"D:\DepressionDetectionDL\models\{m_name}\progres.csv")
     # Save the final model
-    torch.save(model.state_dict(), "best_model.pth")
+    # torch.save(model.state_dict(), f"D:\DepressionDetectionDL\models\{m_name}_{config['epochs']}.pth")
 
 if __name__ == "__main__":
     config = {
