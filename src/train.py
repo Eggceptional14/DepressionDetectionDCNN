@@ -70,7 +70,7 @@ def train_model(config):  # sourcery skip: low-code-quality
         optimizer = optim.Adam(model.parameters(), lr=config['lr'], weight_decay=1e-5)
         scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.1)
 
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.BCELoss()
 
     for epoch in range(start_epoch, config["epochs"]):
         model.train()
@@ -81,13 +81,14 @@ def train_model(config):  # sourcery skip: low-code-quality
 
             if config['model'] == "multimodal":
                 landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
-                label = batch['label'].to(device)
+                label = batch['label'].to(device).float()
                 output, attention_weights = model(landmarks, aus, gaze)
             else:
                 data = batch[config['feature']].to(device)
-                label = batch['label'].to(device)
+                label = batch['label'].to(device).float()
                 output, attention_weights = model(data)
 
+            output = output.squeeze(-1)
             loss = criterion(output, label)
             loss.backward()
             optimizer.step()
@@ -102,15 +103,16 @@ def train_model(config):  # sourcery skip: low-code-quality
             for batch in val_loader:
                 if config['model'] == "multimodal":
                     landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
-                    label = batch['label'].to(device)
+                    label = batch['label'].to(device).float()
                     output, attention_weights = model(landmarks, aus, gaze)
                 else:
                     data = batch[config['feature']].to(device)
-                    label = batch['label'].to(device)
+                    label = batch['label'].to(device).float()
                     output, attention_weights = model(data)
 
+                output = output.squeeze(-1)
                 val_loss += criterion(output, label).item()
-                _, predicted = torch.max(output.data, 1)
+                predicted = torch.round(output)
                 total_correct += (predicted == label).sum().item()
                 total_elements += label.size(0)
 
