@@ -5,3 +5,5 @@ venv/
 *.env
 *.ipynb
 __pycache__/
+3_fps/
+5_fps/
