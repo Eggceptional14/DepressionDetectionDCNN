@@ -13,19 +13,37 @@ load_dotenv()
 
 class DAICDataset(Dataset):
 
-    def __init__(self, split_details, step, is_train=True):
+    def __init__(self, split_details, chunk_size, is_train=True):
         self.split_details = pd.read_csv(split_details) # read split of DAIC dataset (contains pid and labels)
         self.data_url = os.getenv('DAIC_DATA_URL')
         self.is_train = is_train
         self.from_web = False
-        self.frame_step = step
+        # self.frame_step = step
+        self.chunk_size = chunk_size
+
+        self.chunk_info = self._calculate_chunks()
 
     def __len__(self):
         return len(self.split_details)
+    
+    def _calculate_chunks(self):
+        chunk_info = []
+        for idx, row in self.split_details.iterrows():
+            pid = int(row['Participant_ID'])
+            base_url = os.getenv('DISK_DIR')
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt')
+            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
+            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
-    def __getitem__(self, idx):
-        pid = self.split_details['Participant_ID'].iloc[idx]
-
+            # calculate chunk info
+            landmarks = landmarks[landmarks[' success'] == 1]
+            valid_frames = landmarks.shape[0]
+            num_chunks = (valid_frames + self.chunk_size - 1) // self.chunk_size
+            chunk_info.append((pid, num_chunks))
+        
+        return chunk_info
+    
+    def _load_chunk_data(self, pid, chunk_idx):
         if self.from_web:
             file_url = f"{str(pid)}_P.zip"
             print(f'##### Start Downloading File: {file_url} #####\n')
@@ -47,15 +65,20 @@ class DAICDataset(Dataset):
         gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
 
         # sub-sampling frame
-        landmarks = landmarks[::self.frame_step]
-        aus = aus[::self.frame_step]
-        gaze = gaze[::self.frame_step]
-        
+        # landmarks = landmarks[::self.frame_step]
+        # aus = aus[::self.frame_step]
+        # gaze = gaze[::self.frame_step]
+
+        start = chunk_idx * self.chunk_size
+        end_landmarks = min(start + self.chunk_size, len(landmarks))
+        end_aus = min(start + self.chunk_size, len(aus))
+        end_gaze = min(start + self.chunk_size, len(gaze))
+
         sample = {
             'pid': pid,
-            'landmarks': torch.tensor(landmarks, dtype=torch.float32),
-            'aus': torch.tensor(aus, dtype=torch.float32),
-            'gaze': torch.tensor(gaze, dtype=torch.float32)
+            'landmarks': torch.tensor(landmarks[start: end_landmarks], dtype=torch.float32),
+            'aus': torch.tensor(aus[start: end_aus], dtype=torch.float32),
+            'gaze': torch.tensor(gaze[start: end_gaze], dtype=torch.float32)
         }
 
         if self.is_train:
@@ -63,3 +86,13 @@ class DAICDataset(Dataset):
             sample["label"] = label
 
         return sample
+
+    def __getitem__(self, idx):
+        cumulative_chunks = 0
+        for pid, num_chunks in self.chunk_info:
+            if idx < cumulative_chunks + num_chunks:
+                chunk_idx = idx - cumulative_chunks
+                return self._load_chunk_data(pid, chunk_idx)
+            cumulative_chunks += num_chunks
+
+        raise IndexError("Index out of range")
