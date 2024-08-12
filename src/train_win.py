@@ -95,7 +95,7 @@ def train_model(config):
         avg_train_loss = epoch_loss / len(train_loader)
         train_accuracy = total_correct_train / total_train_elements
 
-        print(f'Epoch {epoch}, Training Loss: {avg_train_loss:.4f}, Training Accuracy: {train_accuracy:.4f}')
+        print(f'Training Loss: {avg_train_loss:.4f}, Training Accuracy: {train_accuracy:.4f}')
 
         # Evaluation loop
         model.eval()
@@ -127,8 +127,9 @@ def train_model(config):
         losses.append(avg_val_loss)
         accs.append(accuracy)
 
-        print(f'Epoch {epoch}, Validation Loss: {avg_val_loss:.4f}, Accuracy: {accuracy:.4f}')
+        print(f'Validation Loss: {avg_val_loss:.4f}, Accuracy: {accuracy:.4f}')
         print(scheduler.get_last_lr())
+        print()
 
         scheduler.step(avg_val_loss)
 
