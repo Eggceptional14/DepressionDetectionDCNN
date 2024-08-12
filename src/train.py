@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 import ray
 import ray.cloudpickle as pickle
@@ -63,9 +64,11 @@ def train_model(config):  # sourcery skip: low-code-quality
             start_epoch = checkpoint_state["epoch"]
             model.load_state_dict(checkpoint_state["net_state_dict"])
             optimizer.load_state_dict(checkpoint_state["optimizer_state_dict"])
+            scheduler.load_state_dict(checkpoint_state["lrscheduler_state_dict"])
     else:
         start_epoch = 0
-        optimizer = optim.Adam(model.parameters(), lr=config['lr'])
+        optimizer = optim.Adam(model.parameters(), lr=config['lr'], weight_decay=1e-5)
+        scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.1)
 
     criterion = nn.CrossEntropyLoss()
 
@@ -79,19 +82,15 @@ def train_model(config):  # sourcery skip: low-code-quality
             if config['model'] == "multimodal":
                 landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
                 label = batch['label'].to(device)
-                print(landmarks.shape, aus.shape, gaze.shape)
                 output, attention_weights = model(landmarks, aus, gaze)
-                loss = criterion(output, label)
-                loss.backward()
-                optimizer.step()
             else:
                 data = batch[config['feature']].to(device)
                 label = batch['label'].to(device)
-                num_frames = len(data)
                 output, attention_weights = model(data)
-                loss = criterion(output, label)
-                loss.backward()
-                optimizer.step()
+
+            loss = criterion(output, label)
+            loss.backward()
+            optimizer.step()
 
         # Evaluation loop
         model.eval()
@@ -105,27 +104,26 @@ def train_model(config):  # sourcery skip: low-code-quality
                     landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
                     label = batch['label'].to(device)
                     output, attention_weights = model(landmarks, aus, gaze)
-                    val_loss += criterion(output, label).item()
-                    _, predicted = torch.max(output.data, 1)
-                    total_correct += (predicted == label).sum().item()
-                    total_elements += label.size(0)
-                        
                 else:
                     data = batch[config['feature']].to(device)
                     label = batch['label'].to(device)
                     output, attention_weights = model(data)
-                    val_loss += criterion(output, label).item()
-                    _, predicted = torch.max(output.data, 1)
-                    total_correct += (predicted == label).sum().item()
-                    total_elements += label.size(0)
+
+                val_loss += criterion(output, label).item()
+                _, predicted = torch.max(output.data, 1)
+                total_correct += (predicted == label).sum().item()
+                total_elements += label.size(0)
 
         val_loss /= len(val_loader)
         accuracy = total_correct / total_elements
+
+        scheduler.step(val_loss)
 
         checkpoint_data = {
             "epoch": epoch,
             "net_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
+            "lrscheduler_state_dict": scheduler.state_dict()
         }
 
         with tempfile.TemporaryDirectory() as checkpoint_dir:
