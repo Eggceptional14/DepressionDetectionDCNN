@@ -50,8 +50,8 @@ def train_model(config):  # sourcery skip: low-code-quality
     train_labels_dir = "/Users/pitchakorn/Dissertation/data/daic/train_split_Depression_AVEC2017.csv"
     val_labels_dir = "/Users/pitchakorn/Dissertation/data/daic/dev_split_Depression_AVEC2017.csv"
 
-    train_dataset = DAICDataset(train_labels_dir, config['frame_step'], is_train=True)
-    val_dataset = DAICDataset(val_labels_dir, config['frame_step'], is_train=True)
+    train_dataset = DAICDataset(train_labels_dir, config['chunk_size'], is_train=True)
+    val_dataset = DAICDataset(val_labels_dir, config['chunk_size'], is_train=True)
 
     train_loader = DataLoader(train_dataset, batch_size=config['batch_size'], shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=config['batch_size'], shuffle=True)
@@ -79,27 +79,19 @@ def train_model(config):  # sourcery skip: low-code-quality
             if config['model'] == "multimodal":
                 landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
                 label = batch['label'].to(device)
-                min_frames = min(len(landmarks), len(aus), len(gaze))
-                for i in range(0, min_frames, config['seg_length']):
-                        end_landmarks = min(i + config['seg_length'], len(landmarks))
-                        end_aus = min(i + config['seg_length'], len(aus))
-                        end_gaze = min(i + config['seg_length'], len(gaze))
-                        output, attention_weights = model(landmarks[i:end_landmarks],
-                                                          aus[i:end_aus],
-                                                          gaze[i:end_gaze])
-                        loss = criterion(output, label)
-                        loss.backward()
-                        optimizer.step()
+                print(landmarks.shape, aus.shape, gaze.shape)
+                output, attention_weights = model(landmarks, aus, gaze)
+                loss = criterion(output, label)
+                loss.backward()
+                optimizer.step()
             else:
                 data = batch[config['feature']].to(device)
                 label = batch['label'].to(device)
                 num_frames = len(data)
-                for i in range(0, num_frames, config['seg_length']):
-                    end = min(i + config['seg_length'], num_frames)
-                    output, attention_weights = model(data[i:end])
-                    loss = criterion(output, label)
-                    loss.backward()
-                    optimizer.step()
+                output, attention_weights = model(data)
+                loss = criterion(output, label)
+                loss.backward()
+                optimizer.step()
 
         # Evaluation loop
         model.eval()
@@ -112,30 +104,20 @@ def train_model(config):  # sourcery skip: low-code-quality
                 if config['model'] == "multimodal":
                     landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
                     label = batch['label'].to(device)
-                    min_frames = min(len(landmarks), len(aus), len(gaze))
-                    for i in range(0, min_frames, config['seg_length']):
-                        end_landmarks = min(i + config['seg_length'], len(landmarks))
-                        end_aus = min(i + config['seg_length'], len(aus))
-                        end_gaze = min(i + config['seg_length'], len(gaze))
-                        output, attention_weights = model(landmarks[i:end_landmarks],
-                                                          aus[i:end_aus],
-                                                          gaze[i:end_gaze])
-                        val_loss += criterion(output, label).item()
-                        _, predicted = torch.max(output.data, 1)
-                        total_correct += (predicted == label).sum().item()
-                        total_elements += label.size(0)
+                    output, attention_weights = model(landmarks, aus, gaze)
+                    val_loss += criterion(output, label).item()
+                    _, predicted = torch.max(output.data, 1)
+                    total_correct += (predicted == label).sum().item()
+                    total_elements += label.size(0)
                         
                 else:
                     data = batch[config['feature']].to(device)
                     label = batch['label'].to(device)
-                    num_frames = len(data)
-                    for i in range(0, num_frames, config['seg_length']):
-                        end = min(i + config['seg_length'], num_frames)
-                        output, attention_weights = model(data[i:end])
-                        val_loss += criterion(output, label).item()
-                        _, predicted = torch.max(output.data, 1)
-                        total_correct += (predicted == label).sum().item()
-                        total_elements += label.size(0)
+                    output, attention_weights = model(data)
+                    val_loss += criterion(output, label).item()
+                    _, predicted = torch.max(output.data, 1)
+                    total_correct += (predicted == label).sum().item()
+                    total_elements += label.size(0)
 
         val_loss /= len(val_loader)
         accuracy = total_correct / total_elements
