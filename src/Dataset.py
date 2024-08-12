@@ -35,9 +35,14 @@ class DAICDataset(Dataset):
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
-            # calculate chunk info
             landmarks = landmarks[landmarks[' success'] == 1]
-            valid_frames = landmarks.shape[0]
+            aus = aus[aus[' success'] == 1]
+            gaze = gaze[gaze[' success'] == 1]
+
+            valid_indices = landmarks.index.intersection(aus.index).intersection(gaze.index)
+
+            # calculate chunk info
+            valid_frames = landmarks.loc[valid_indices].shape[0]
             num_chunks = (valid_frames + self.chunk_size - 1) // self.chunk_size
             chunk_info.append((pid, num_chunks))
         
@@ -60,9 +65,18 @@ class DAICDataset(Dataset):
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
         # remove frames that openface failed to capture the feature
-        landmarks = landmarks[landmarks[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
-        aus = aus[aus[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
-        gaze = gaze[gaze[' success'] == 1].iloc[:, 4:].values.astype(np.float32)
+        landmarks = landmarks[landmarks[' success'] == 1]
+        aus = aus[aus[' success'] == 1]
+        gaze = gaze[gaze[' success'] == 1]
+        
+        # Align indices to ensure consistency across landmarks, AUs, and gaze
+        valid_indices = landmarks.index.intersection(aus.index).intersection(gaze.index)
+
+        # Select only the valid frames that exist in all features
+        landmarks = landmarks.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
+        aus = aus.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
+        gaze = gaze.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
+
 
         # sub-sampling frame
         # landmarks = landmarks[::self.frame_step]
@@ -70,16 +84,18 @@ class DAICDataset(Dataset):
         # gaze = gaze[::self.frame_step]
 
         start = chunk_idx * self.chunk_size
-        end_landmarks = min(start + self.chunk_size, len(landmarks))
-        end_aus = min(start + self.chunk_size, len(aus))
-        end_gaze = min(start + self.chunk_size, len(gaze))
+        end = min(start + self.chunk_size, len(landmarks))
+        # end_landmarks = min(start + self.chunk_size, len(landmarks))
+        # end_aus = min(start + self.chunk_size, len(aus))
+        # end_gaze = min(start + self.chunk_size, len(gaze))
 
         sample = {
             'pid': pid,
-            'landmarks': torch.tensor(landmarks[start: end_landmarks], dtype=torch.float32),
-            'aus': torch.tensor(aus[start: end_aus], dtype=torch.float32),
-            'gaze': torch.tensor(gaze[start: end_gaze], dtype=torch.float32)
+            'landmarks': torch.tensor(landmarks[start: end], dtype=torch.float32),
+            'aus': torch.tensor(aus[start: end], dtype=torch.float32),
+            'gaze': torch.tensor(gaze[start: end], dtype=torch.float32)
         }
+        print(sample)
 
         if self.is_train:
             label = self.split_details[self.split_details['Participant_ID'] == pid]['PHQ8_Binary'].values[0]

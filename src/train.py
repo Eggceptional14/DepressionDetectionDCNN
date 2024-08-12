@@ -79,6 +79,7 @@ def train_model(config):  # sourcery skip: low-code-quality
             if config['model'] == "multimodal":
                 landmarks, aus, gaze = batch['landmarks'].to(device), batch['aus'].to(device), batch['gaze'].to(device)
                 label = batch['label'].to(device)
+                print(landmarks.shape, aus.shape, gaze.shape)
                 output, attention_weights = model(landmarks, aus, gaze)
                 loss = criterion(output, label)
                 loss.backward()
