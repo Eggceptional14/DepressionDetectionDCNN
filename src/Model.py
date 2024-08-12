@@ -52,6 +52,7 @@ class CNNModel(nn.Module):
         x = x.squeeze(-1)
 
         x = self.fc(x)
+        x = torch.sigmoid(x)
         return x, attention_weights
 class LSTMModel(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, device, dropout_prob, num_layers=1):
@@ -65,7 +66,6 @@ class LSTMModel(nn.Module):
         self.attention = Attention(hidden_size, 1)
 
         # self.fc = nn.Linear(hidden_size, output_size)
-        self.softmax = nn.Softmax(dim=1)
 
         self.dropout = nn.Dropout(dropout_prob)
 
@@ -87,10 +87,11 @@ class LSTMModel(nn.Module):
         out = out[:, -1, :]
         out = self.dropout(out)
         out = self.fc(out)
-        return self.softmax(out), attention_weights
+        out = torch.sigmoid(out)
+        return out, attention_weights
     
 class MultiModalModel(nn.Module):
-    def __init__(self, ip_size_landmarks, ip_size_aus, ip_size_gaze, hidden_size, output_size, device, num_layers=1):
+    def __init__(self, ip_size_landmarks, ip_size_aus, ip_size_gaze, hidden_size, output_size, device, dropout_prob, num_layers=1):
         super(MultiModalModel, self).__init__()
         self.num_layers = num_layers
         self.hidden_size = hidden_size
@@ -104,11 +105,15 @@ class MultiModalModel(nn.Module):
         self.attention_aus = Attention(hidden_size, 1)
         self.attention_gaze = Attention(hidden_size, 1)
 
+        self.dropout = nn.Dropout(dropout_prob)
+
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size * 3, 64),
+            nn.Linear(hidden_size, 64),
             nn.ReLU(),
+            nn.Dropout(dropout_prob),
             nn.Linear(64, 32),
             nn.ReLU(),
+            nn.Dropout(dropout_prob),
             nn.Linear(32, output_size),
         )
 
@@ -133,6 +138,12 @@ class MultiModalModel(nn.Module):
         out_aus = out_aus[:, -1, :]
         out_gaze = out_gaze[:, -1, :]
 
-        combined_out = torch.cat((out_landmarks, out_aus, out_gaze), dim=1)
+        out_landmarks = self.dropout(out_landmarks)
+        out_aus = self.dropout(out_aus)
+        out_gaze = self.dropout(out_gaze)
 
-        return self.fc(combined_out), (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze)
+        combined_out = torch.cat((out_landmarks, out_aus, out_gaze), dim=1)
+        out = self.fc(combined_out)
+        out = torch.sigmoid(out)
+
+        return out_gaze, (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze)
