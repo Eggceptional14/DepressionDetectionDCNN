@@ -31,19 +31,19 @@ def train_model(config):  # sourcery skip: low-code-quality
         model = LSTMModel(input_size=feature_size[config['feature']], 
                           hidden_size=config['hidden_size'], 
                           dropout_prob=config['dropout'], 
-                          output_size=2, 
+                          output_size=1, 
                           device=device)
     elif config['model'] == "cnn":
         model = CNNModel(input_channels=feature_size[config['feature']], 
                          hidden_size=config['hidden_size'], 
-                         output_size=2, 
+                         output_size=1, 
                          dropout=config['dropout'])
     elif config['model'] == "multimodal":
         model = MultiModalModel(ip_size_landmarks=feature_size['landmarks'],
                                 ip_size_aus=feature_size['aus'],
                                 ip_size_gaze=feature_size['gaze'],
                                 hidden_size=config['hidden_size'],
-                                output_size=2,
+                                output_size=1,
                                 device=device)
 
     model.to(device)
