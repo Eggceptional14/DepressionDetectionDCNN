@@ -24,7 +24,8 @@ class DAICDataset(Dataset):
         self.chunk_info = self._calculate_chunks()
 
     def __len__(self):
-        return len(self.split_details)
+        total_chunks = sum(num_chunks for _, num_chunks in self.chunk_info)
+        return total_chunks
     
     def _calculate_chunks(self):
         chunk_info = []
@@ -95,11 +96,14 @@ class DAICDataset(Dataset):
             'aus': torch.tensor(aus[start: end], dtype=torch.float32),
             'gaze': torch.tensor(gaze[start: end], dtype=torch.float32)
         }
-        print(sample)
+        # print(sample)
 
         if self.is_train:
             label = self.split_details[self.split_details['Participant_ID'] == pid]['PHQ8_Binary'].values[0]
             sample["label"] = label
+        else:
+            actual = self.split_details[self.split_details['Participant_ID'] == pid]['PHQ_Binary'].values[0]
+            sample["actual"] = actual
 
         return sample
 
