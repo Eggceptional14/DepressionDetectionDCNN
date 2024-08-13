@@ -31,7 +31,8 @@ class DAICDataset(Dataset):
         chunk_info = []
         for idx, row in self.split_details.iterrows():
             pid = int(row['Participant_ID'])
-            base_url = os.getenv('DISK_DIR')
+            # base_url = os.getenv('DISK_DIR')
+            base_url = os.getenv('WIN_DIR')
             landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt')
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
@@ -60,8 +61,12 @@ class DAICDataset(Dataset):
             aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
             gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
         else:
-            base_url = os.getenv('DISK_DIR')
-            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt')
+            sample_df = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', nrows=5)
+            dtype_spec = {col: 'float32' for col in sample_df.columns[4:]}
+
+            # base_url = os.getenv('DISK_DIR')
+            base_url = os.getenv('WIN_DIR')
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', dtype=dtype_spec)
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
