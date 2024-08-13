@@ -34,11 +34,8 @@ class DAICDataset(Dataset):
         
         for idx, row in self.split_details.iterrows():
             pid = int(row['Participant_ID'])
-
-            header = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', sep=",", nrows=0)
-            dtype_spec = {col: 'float32' for col in header.columns[4:]}
             
-            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', dtype=dtype_spec)
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', low_memory=False)
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
@@ -62,17 +59,14 @@ class DAICDataset(Dataset):
             data = file_processor(self.data_url + file_url)
             print('##### Download Complete #####')
 
-            landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')))
+            landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')), low_memory=False)
             aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
             gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
         else:
             # base_url = os.getenv('DISK_DIR')
             base_url = os.getenv('WIN_DIR')
-
-            header = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', sep=",", nrows=0)
-            dtype_spec = {col: 'float32' for col in header.columns[4:]}
             
-            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', dtype=dtype_spec)
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', low_memory=False)
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
 
@@ -89,7 +83,6 @@ class DAICDataset(Dataset):
         aus = aus.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
         gaze = gaze.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
 
-
         # sub-sampling frame
         # landmarks = landmarks[::self.frame_step]
         # aus = aus[::self.frame_step]
@@ -97,9 +90,6 @@ class DAICDataset(Dataset):
 
         start = chunk_idx * self.chunk_size
         end = min(start + self.chunk_size, len(landmarks))
-        # end_landmarks = min(start + self.chunk_size, len(landmarks))
-        # end_aus = min(start + self.chunk_size, len(aus))
-        # end_gaze = min(start + self.chunk_size, len(gaze))
 
         sample = {
             'pid': pid,
