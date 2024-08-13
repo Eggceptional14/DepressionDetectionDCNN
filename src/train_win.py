@@ -51,10 +51,14 @@ def train_model(config):
     optimizer = optim.Adam(model.parameters(), lr=config['lr'], weight_decay=1e-5)
     criterion = nn.BCELoss()
 
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.1)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.9)
 
-    accs, losses = [], []
+    t_accs, v_accs, t_losses, v_losses = [], [], [], []
     best_accuracy = 0.0
+    best_val_loss = float('inf')
+
+    patience = 5
+    noimp_count = 0
 
     for epoch in range(config['epochs']):
         model.train()
@@ -95,6 +99,9 @@ def train_model(config):
         avg_train_loss = epoch_loss / len(train_loader)
         train_accuracy = total_correct_train / total_train_elements
 
+        t_losses.append(avg_train_loss)
+        t_accs.append(train_accuracy)
+
         print(f'Training Loss: {avg_train_loss:.4f}, Training Accuracy: {train_accuracy:.4f}')
 
         # Evaluation loop
@@ -124,30 +131,52 @@ def train_model(config):
         avg_val_loss = val_loss / len(val_loader)
         accuracy = total_correct / total_elements
 
-        losses.append(avg_val_loss)
-        accs.append(accuracy)
+        v_losses.append(avg_val_loss)
+        v_accs.append(accuracy)
 
         print(f'Validation Loss: {avg_val_loss:.4f}, Accuracy: {accuracy:.4f}')
         print(scheduler.get_last_lr())
         print()
 
+        data = {'model': model,
+                'optimizer': optimizer,
+                'scheduler': scheduler}
+
         scheduler.step(avg_val_loss)
 
-        if accuracy > best_accuracy:
+        if accuracy >= best_accuracy and avg_val_loss < best_val_loss:
             best_accuracy = accuracy
-            best_model_dir = os.path.join(r"D:\DepressionDetectionDL\models", m_name, "best_model")
-            os.makedirs(best_model_dir, exist_ok=True)
-            torch.save(model.state_dict(), os.path.join(best_model_dir, "model.pth"))
-            torch.save(optimizer.state_dict(), os.path.join(best_model_dir, "optim.pth"))
+            best_val_loss = avg_val_loss
+            noimp_count = 0
+            print(f'Best validation Loss: {avg_val_loss:.4f}, Accuracy: {accuracy:.4f}')
+            _save_model(m_name, epoch, data, best_model=True)
+        else:
+            noimp_count += 1
+        
+        if noimp_count >= patience:
+            print(f"Early stopping triggered after {epoch} epochs.")
+            _save_model(m_name, epoch, data)
+            break
 
         if epoch != 0 and ((epoch % 10 == 0) or (epoch == config['epochs'] - 1)):
-            save_dir = os.path.join(r"D:\DepressionDetectionDL\models", m_name, str(epoch))
-            os.makedirs(save_dir, exist_ok=True)
+            _save_model(m_name, epoch, data)
             
-            torch.save(model.state_dict(), os.path.join(save_dir, "model.pth"))
-            torch.save(optimizer.state_dict(), os.path.join(save_dir, "optim.pth"))
-            
-    pd.DataFrame({'loss': losses, 'accuracy': accs}).to_csv(f"D:\DepressionDetectionDL\models\{m_name}\progres.csv")
+    pd.DataFrame({'train_loss': t_losses, 
+                  'train_accuracy': t_accs, 
+                  'val_loss': v_losses, 
+                  'val_accuracy': v_accs}).to_csv(f"D:\DepressionDetectionDL\models\{m_name}\progres.csv")
+    
+def _save_model(m_name, epoch, data, best_model=False):
+    if best_model:
+        dir = os.path.join(r"D:\DepressionDetectionDL\models", m_name, "best_model")
+    else:
+        dir = os.path.join(r"D:\DepressionDetectionDL\models", m_name, str(epoch))
+
+    os.makedirs(dir, exist_ok=True)
+    
+    torch.save(data['model'].state_dict(), os.path.join(dir, "model.pth"))
+    torch.save(data['optimizer'].state_dict(), os.path.join(dir, "optim.pth"))
+    torch.save(data['scheduler'].state_dict(), os.path.join(dir, "lrscheduler.pth"))
 
 if __name__ == "__main__":
     config = {
