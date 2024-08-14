@@ -57,7 +57,7 @@ def train_model(config):
     best_accuracy = 0.0
     best_val_loss = float('inf')
 
-    patience = 5
+    patience = 10
     noimp_count = 0
 
     for epoch in range(config['epochs']):
