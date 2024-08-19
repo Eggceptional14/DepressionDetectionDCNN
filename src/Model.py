@@ -130,11 +130,14 @@ class MultiModalModel(nn.Module):
         super(MultiModalModel, self).__init__()
         
         self.landmarks_lstm = LSTMModule(ip_size_landmarks, hidden_size, num_layers, dropout_prob, device)
-        self.aus_lstm = LSTMModule(ip_size_aus, hidden_size, num_layers, dropout_prob, device)
-        self.gaze_lstm = LSTMModule(ip_size_gaze, hidden_size, num_layers, dropout_prob, device)
+        
+        self.aus_cnn = CNNModule(ip_size_aus, dropout_prob)
+        self.gaze_cnn = CNNModule(ip_size_gaze, dropout_prob)
+
+        self.combined_attention = Attention(hidden_size + 256 * 2, num_heads=4)
 
         self.fc = nn.Sequential(
-            nn.Linear(hidden_size * 3, 128),
+            nn.Linear(hidden_size + 256 * 2, 128),
             nn.ReLU(),
             nn.Dropout(dropout_prob),
             nn.Linear(128, 64),
@@ -145,10 +148,16 @@ class MultiModalModel(nn.Module):
 
     def forward(self, landmarks, aus, gaze):
         out_landmarks, attn_weights_landmarks = self.landmarks_lstm(landmarks)
-        out_aus, attn_weights_aus = self.aus_lstm(aus)
-        out_gaze, attn_weights_gaze = self.gaze_lstm(gaze)
+        
+        out_aus, attn_weights_aus = self.aus_cnn(aus)
+        out_gaze, attn_weights_gaze = self.gaze_cnn(gaze)
 
-        combined_out = torch.cat((out_landmarks, out_aus, out_gaze), dim=1)
+        combined_out = torch.cat((out_landmarks, out_aus, out_gaze), dim=1).unsqueeze(1)
+
+        # combined_out, combined_attention_weights = self.combined_attention(combined_out)
+
+        combined_out = combined_out.squeeze(1)
+
         out = self.fc(combined_out)
         
         return out, (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze)
