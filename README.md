@@ -1,21 +1,29 @@
 # Depression Detection from Facial Image using Deep Neural Network
 
-Simple overview of use/purpose.
+This repository contains a source code/ trained model for depression classification. Source code can be adjust to be used with both Window/Mac machines, and also there is a jupyter notebook file that is able to run in Google Colab.
 
 ## Description
 
-An in-depth paragraph about your project and overview of use.
+This project investigates the performance of predicting depression in a CNN and LSTM model using a single feature compared to a Multimodal model that combines multiple features to produce a prediction. The Distress Analysis Interview Corpus (DAIC), provided by the University of Southern California, was used to train all the models.
 
 ## Getting Started
 
 ### Dependencies
 
-* Python 3.12.0
+* Python 3.11.9 or 3.12.0
 
 ### Installing
 
+Mac OS
+
 ```
 pip install -r requirements.txt
+```
+
+Window
+
+```
+pip install -r requirements_win.txt
 ```
 
 ## Authors
@@ -30,6 +38,10 @@ This project is licensed under the GPL-3.0 License - see the [LICENSE](LICENSE) 
 
 My sincere gratitude goes toward my advisor Dr. Edmond S. L. Ho for guiding this project. I also
 wanted to express my thanks towards USC Institute for Creative Technology for providing the dataset used by this project.
+
+## 📝 Note
+- there might be an error when installing requirements on window, if so please remove torch from requirements file and download the version you wish to use.
+- I cannot provide you with the data, if you want to access the data please visit this website: [DAIC-WOZ](https://dcapswoz.ict.usc.edu)
 
 
 <!-- Inspiration, code snippets, etc.
