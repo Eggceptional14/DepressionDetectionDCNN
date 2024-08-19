@@ -24,8 +24,7 @@ class DAICDataset(Dataset):
         self.chunk_info = self._calculate_chunks()
 
     def __len__(self):
-        total_chunks = sum(num_chunks for _, num_chunks in self.chunk_info)
-        return total_chunks
+        return sum(num_chunks for _, num_chunks in self.chunk_info)
     
     def _calculate_chunks(self):
         chunk_info = []
@@ -69,11 +68,6 @@ class DAICDataset(Dataset):
             landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', low_memory=False)
             aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
             gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
-
-        # remove frames that openface failed to capture the feature
-        landmarks = landmarks[landmarks[' success'] == 1]
-        aus = aus[aus[' success'] == 1]
-        gaze = gaze[gaze[' success'] == 1]
         
         # Align indices to ensure consistency across landmarks, AUs, and gaze
         valid_indices = landmarks.index.intersection(aus.index).intersection(gaze.index)
@@ -82,11 +76,6 @@ class DAICDataset(Dataset):
         landmarks = landmarks.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
         aus = aus.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
         gaze = gaze.loc[valid_indices].iloc[:, 4:].values.astype(np.float32)
-
-        # sub-sampling frame
-        # landmarks = landmarks[::self.frame_step]
-        # aus = aus[::self.frame_step]
-        # gaze = gaze[::self.frame_step]
 
         start = chunk_idx * self.chunk_size
         end = min(start + self.chunk_size, len(landmarks))
