@@ -3,7 +3,8 @@ sample dissertation/
 .DS_Store
 venv/
 *.env
-*.ipynb
+train.ipynb
+test.ipynb
 __pycache__/
 3_fps/
 5_fps/
