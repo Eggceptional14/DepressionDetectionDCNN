@@ -5,6 +5,7 @@ venv/
 *.env
 train.ipynb
 test.ipynb
+model_vis.ipynb
 __pycache__/
 3_fps/
 5_fps/
