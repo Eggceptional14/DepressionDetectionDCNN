@@ -28,15 +28,15 @@ class DAICDataset(Dataset):
     
     def _calculate_chunks(self):
         chunk_info = []
-        # base_url = os.getenv('DISK_DIR')
-        base_url = os.getenv('WIN_DIR')
+        base_url = os.getenv('DISK_DIR')
+        # base_url = os.getenv('WIN_DIR')
         
         for idx, row in self.split_details.iterrows():
             pid = int(row['Participant_ID'])
             
-            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', low_memory=False)
-            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
-            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.csv', low_memory=False)
+            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.csv')
+            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.csv')
 
             landmarks = landmarks[landmarks[' success'] == 1]
             aus = aus[aus[' success'] == 1]
@@ -58,16 +58,16 @@ class DAICDataset(Dataset):
             data = file_processor(self.data_url + file_url)
             print('##### Download Complete #####')
 
-            landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.txt')), low_memory=False)
-            aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.txt')))
-            gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.txt')))
+            landmarks = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_features.csv')), low_memory=False)
+            aus = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_AUs.csv')))
+            gaze = pd.read_csv(io.BytesIO(data.get(f'{pid}_CLNF_gaze.csv')))
         else:
-            # base_url = os.getenv('DISK_DIR')
-            base_url = os.getenv('WIN_DIR')
+            base_url = os.getenv('DISK_DIR')
+            # base_url = os.getenv('WIN_DIR')
             
-            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.txt', low_memory=False)
-            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.txt')
-            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.txt')
+            landmarks = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_features.csv', low_memory=False)
+            aus = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_AUs.csv')
+            gaze = pd.read_csv(f'{base_url}{pid}/{pid}_CLNF_gaze.csv')
         
         # Align indices to ensure consistency across landmarks, AUs, and gaze
         valid_indices = landmarks.index.intersection(aus.index).intersection(gaze.index)

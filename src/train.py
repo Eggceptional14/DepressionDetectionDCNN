@@ -37,12 +37,14 @@ def train_model(config):  # sourcery skip: low-code-quality
         model = CNNModel(input_channels=feature_size[config['feature']], 
                          hidden_size=config['hidden_size'], 
                          output_size=1, 
-                         dropout=config['dropout'])
+                         dropout_prob=config['dropout'])
     elif config['model'] == "multimodal":
         model = MultiModalModel(ip_size_landmarks=feature_size['landmarks'],
                                 ip_size_aus=feature_size['aus'],
                                 ip_size_gaze=feature_size['gaze'],
                                 hidden_size=config['hidden_size'],
+                                dropout_prob=config['dropout'],
+                                combined_attn=True,
                                 output_size=1,
                                 device=device)
 

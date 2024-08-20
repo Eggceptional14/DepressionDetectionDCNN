@@ -36,7 +36,7 @@ class LSTMModule(nn.Module):
         return out, attention_weights
 
 class CNNModule(nn.Module):
-    def __init__(self, input_channels, dropout):
+    def __init__(self, input_channels, dropout_prob):
         super(CNNModule, self).__init__()
 
         self.conv1 = nn.Conv1d(input_channels, 64, kernel_size=3, padding=1)
@@ -47,7 +47,7 @@ class CNNModule(nn.Module):
         self.pool2 = nn.MaxPool1d(kernel_size=2, stride=2)
         self.pool3 = nn.MaxPool1d(kernel_size=2, stride=2)
 
-        self.dropout = nn.Dropout(p=dropout)
+        self.dropout = nn.Dropout(p=dropout_prob)
 
         self.relu1 = nn.ReLU()
         self.relu2 = nn.ReLU()
@@ -84,18 +84,18 @@ class CNNModule(nn.Module):
         return x, attention_weights
 
 class CNNModel(nn.Module):
-    def __init__(self, input_channels, output_size, dropout):
+    def __init__(self, input_channels, output_size, dropout_prob):
         super(CNNModel, self).__init__()
 
-        self.cnn_module = CNNModule(input_channels, dropout)
+        self.cnn_module = CNNModule(input_channels, dropout_prob)
 
         self.fc = nn.Sequential(
             nn.Linear(256, 128),
             nn.ReLU(),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout_prob),
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Dropout(dropout),
+            nn.Dropout(dropout_prob),
             nn.Linear(64, output_size),
         )
 
@@ -126,7 +126,7 @@ class LSTMModel(nn.Module):
         return x, attention_weights
 
 class MultiModalModel(nn.Module):
-    def __init__(self, ip_size_landmarks, ip_size_aus, ip_size_gaze, hidden_size, output_size, device, dropout_prob, num_layers=1):
+    def __init__(self, ip_size_landmarks, ip_size_aus, ip_size_gaze, hidden_size, output_size, device, dropout_prob, combined_attn=True, num_layers=1):
         super(MultiModalModel, self).__init__()
         
         self.landmarks_lstm = LSTMModule(ip_size_landmarks, hidden_size, num_layers, dropout_prob, device)
@@ -135,6 +135,7 @@ class MultiModalModel(nn.Module):
         self.gaze_cnn = CNNModule(ip_size_gaze, dropout_prob)
 
         self.combined_attention = Attention(hidden_size + 256 * 2, num_heads=4)
+        self.combined_attn = combined_attn
 
         self.fc = nn.Sequential(
             nn.Linear(hidden_size + 256 * 2, 128),
@@ -154,10 +155,14 @@ class MultiModalModel(nn.Module):
 
         combined_out = torch.cat((out_landmarks, out_aus, out_gaze), dim=1).unsqueeze(1)
 
-        # combined_out, combined_attention_weights = self.combined_attention(combined_out)
+        if self.combined_attn:
+            combined_out, combined_attention_weights = self.combined_attention(combined_out)
 
         combined_out = combined_out.squeeze(1)
 
         out = self.fc(combined_out)
         
-        return out, (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze)
+        if self.combined_attn:
+            return out, (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze, combined_attention_weights)
+        else:
+            return out, (attn_weights_landmarks, attn_weights_aus, attn_weights_gaze)
