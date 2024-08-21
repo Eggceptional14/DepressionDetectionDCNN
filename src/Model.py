@@ -125,9 +125,9 @@ class LSTMModel(nn.Module):
         x = self.fc(x)
         return x, attention_weights
 
-class MultiModalModel(nn.Module):
+class CombinationModel(nn.Module):
     def __init__(self, ip_size_landmarks, ip_size_aus, ip_size_gaze, hidden_size, output_size, device, dropout_prob, combined_attn=True, num_layers=1):
-        super(MultiModalModel, self).__init__()
+        super(CombinationModel, self).__init__()
         
         self.landmarks_lstm = LSTMModule(ip_size_landmarks, hidden_size, num_layers, dropout_prob, device)
         

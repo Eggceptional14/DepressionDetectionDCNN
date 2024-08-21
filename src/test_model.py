@@ -26,7 +26,7 @@ def test(config):
                          output_size=1, 
                          dropout=config['dropout'])
     elif config['model'] == "multimodal":
-        model = MultiModalModel(ip_size_landmarks=feature_size['landmarks'],
+        model = CombinationModel(ip_size_landmarks=feature_size['landmarks'],
                                 ip_size_aus=feature_size['aus'],
                                 ip_size_gaze=feature_size['gaze'],
                                 hidden_size=config['hidden_size'],
