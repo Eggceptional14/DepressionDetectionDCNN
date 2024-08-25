@@ -14,7 +14,7 @@ from ray import train,tune
 from ray.train import Checkpoint
 from ray.tune.schedulers import ASHAScheduler
 
-from Model import CNNModel, LSTMModel, CombinationModel
+from Model import CNNModel, LSTMModel, MultimodalModel
 from Dataset import DAICDataset
 
 load_dotenv()
@@ -39,7 +39,7 @@ def train_model(config):  # sourcery skip: low-code-quality
                          output_size=1, 
                          dropout_prob=config['dropout'])
     elif config['model'] == "multimodal":
-        model = CombinationModel(ip_size_landmarks=feature_size['landmarks'],
+        model = MultimodalModel(ip_size_landmarks=feature_size['landmarks'],
                                 ip_size_aus=feature_size['aus'],
                                 ip_size_gaze=feature_size['gaze'],
                                 hidden_size=config['hidden_size'],
